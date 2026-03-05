@@ -12,43 +12,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       
-      - name: List project structure
-        run: |
-          echo "=== Project Structure ==="
-          ls -la
-          echo ""
-          echo "=== Xcode Project Files ==="
-          find . -name "*.xcodeproj" -o -name "*.xcworkspace"
-          echo ""
-          echo "=== Project.pbxproj ==="
-          find . -name "project.pbxproj" | head -1 | xargs cat 2>/dev/null | head -50
-      
       - name: Find Xcode project
         id: find_project
         run: |
-          # Find the .xcodeproj directory
           proj_dir=$(find . -name "*.xcodeproj" -type d | head -1)
           if [ -z "$proj_dir" ]; then
             echo "No Xcode project found!"
             exit 1
           fi
-          echo "project_dir=$proj_dir" >> $GITHUB_OUTPUT
-          echo "Found project: $proj_dir"
-          
-          # Extract project name (without .xcodeproj)
           proj_name=$(basename "$proj_dir" .xcodeproj)
+          echo "project_dir=$proj_dir" >> $GITHUB_OUTPUT
           echo "project_name=$proj_name" >> $GITHUB_OUTPUT
-          echo "Project name: $proj_name"
+          echo "Found: $proj_name in $proj_dir"
       
-      - name: Build without code signing
+      - name: Build for Simulator
         run: |
           proj_dir="${{ steps.find_project.outputs.project_dir }}"
           proj_name="${{ steps.find_project.outputs.project_name }}"
           
-          echo "=== Building $proj_name ==="
-          echo "Project directory: $proj_dir"
+          echo "Building $proj_name for iOS Simulator..."
           
-          # Build with code signing disabled
           xcodebuild \
             -project "$proj_dir" \
             -scheme "$proj_name" \
@@ -58,21 +41,45 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
+            ARCHS="x86_64 arm64" \
+            VALID_ARCHS="x86_64 arm64" \
+            ONLY_ACTIVE_ARCH=NO \
             build \
-            ONLY_ACTIVE_ARCH=YES \
             | tee build.log \
             | xcpretty || {
-              echo "Build failed! Showing last 100 lines of log:"
+              echo "Build failed!"
               tail -100 build.log
               exit 1
             }
+          
+          echo "Build completed successfully!"
+          echo "Finding .app bundle..."
+          find build -name "*.app" -type d | head -5
+          
+          # Copy app to artifacts folder
+          mkdir -p artifacts
+          app_path=$(find build -name "*.app" -type d | head -1)
+          if [ -n "$app_path" ]; then
+            cp -R "$app_path" artifacts/
+            echo "Copied app to artifacts/"
+            ls -la artifacts/
+          else
+            echo "No .app bundle found!"
+            exit 1
+          fi
       
-      - name: Upload build artifact
+      - name: Upload App Artifact
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: App-Spam-Otp-Debug
-          path: |
-            build/Debug-iphonesimulator/*.app
-            build.log
+          name: App-Spam-Otp-Simulator
+          path: artifacts/*.app
+          retention-days: 14
+      
+      - name: Upload Build Log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Build-Log
+          path: build.log
           retention-days: 7
