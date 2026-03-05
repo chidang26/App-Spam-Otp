@@ -19,25 +19,35 @@ jobs:
           echo ""
           echo "=== Xcode Project ==="
           find . -name "*.xcodeproj" -type d
-          echo ""
-          echo "=== Project.pbxproj (first 50 lines) ==="
-          find . -name "project.pbxproj" | head -1 | xargs head -50
+      
+      - name: List available simulators
+        run: |
+          echo "=== Available Simulators ==="
+          xcrun simctl list devices available | head -50
       
       - name: Try xcodebuild list
         run: |
           echo "=== Listing Xcode schemes ==="
           xcodebuild -project ./xcodeapptesst/xcodeapptesst.xcodeproj -list
       
-      - name: Build with xcodebuild
+      - name: Build with xcodebuild (generic)
         run: |
           echo "=== Starting build ==="
-          xcodebuild -project ./xcodeapptesst/xcodeapptesst.xcodeproj -scheme xcodeapptesst -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15' CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= -configuration Debug build 2>&1 | tee build_output.log
+          xcodebuild -project ./xcodeapptesst/xcodeapptesst.xcodeproj -scheme xcodeapptesst -sdk iphonesimulator CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= -configuration Debug build 2>&1 | tee build_output.log
           echo "=== Build finished ==="
       
-      - name: Show build output
+      - name: Show build result
         run: |
-          echo "=== Last 100 lines of build output ==="
-          tail -100 build_output.log
+          echo "=== Last 50 lines of build output ==="
+          tail -50 build_output.log
+          echo ""
+          echo "=== Checking for errors ==="
+          if grep -q "error:" build_output.log; then
+            echo "ERRORS FOUND:"
+            grep "error:" build_output.log | tail -20
+          else
+            echo "No errors found!"
+          fi
       
       - name: Upload build log
         uses: actions/upload-artifact@v4
