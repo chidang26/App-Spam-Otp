@@ -1,0 +1,48 @@
+name: Simple iOS Build Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  test-build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Show project structure
+        run: |
+          echo "=== Project Structure ==="
+          ls -la
+          echo ""
+          echo "=== Xcode Project ==="
+          find . -name "*.xcodeproj" -type d
+          echo ""
+          echo "=== Project.pbxproj (first 50 lines) ==="
+          find . -name "project.pbxproj" | head -1 | xargs head -50
+      
+      - name: Try xcodebuild list
+        run: |
+          echo "=== Listing Xcode schemes ==="
+          xcodebuild -project ./xcodeapptesst/xcodeapptesst.xcodeproj -list
+      
+      - name: Build with xcodebuild
+        run: |
+          echo "=== Starting build ==="
+          xcodebuild -project ./xcodeapptesst/xcodeapptesst.xcodeproj -scheme xcodeapptesst -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15' CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= -configuration Debug build 2>&1 | tee build_output.log
+          echo "=== Build finished ==="
+      
+      - name: Show build output
+        run: |
+          echo "=== Last 100 lines of build output ==="
+          tail -100 build_output.log
+      
+      - name: Upload build log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-output
+          path: build_output.log
+          retention-days: 3
