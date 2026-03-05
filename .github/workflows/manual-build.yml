@@ -1,0 +1,33 @@
+name: Manual Build Trigger
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: List project files
+        run: |
+          echo "=== Project Structure ==="
+          ls -la
+          echo "=== Xcode Project ==="
+          find . -name "*.xcodeproj" -o -name "*.xcworkspace"
+      
+      - name: Build with Xcode
+        run: |
+          # Find the project
+          if [ -d "*.xcworkspace" ]; then
+            project=$(ls -d *.xcworkspace | head -1)
+            echo "Building workspace: $project"
+            xcodebuild -workspace "$project" -scheme "$(xcodebuild -workspace "$project" -list -json | python3 -c "import sys, json; print(json.load(sys.stdin)['project']['targets'][0])")" build
+          else
+            project=$(ls -d *.xcodeproj | head -1)
+            echo "Building project: $project"
+            xcodebuild -project "$project" -scheme "$(xcodebuild -project "$project" -list -json | python3 -c "import sys, json; print(json.load(sys.stdin)['project']['targets'][0])")" build
+          fi
